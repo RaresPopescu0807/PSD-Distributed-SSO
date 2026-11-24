@@ -1,0 +1,37 @@
+# The SSO server and the three applications, each in its own container.
+# You call them from Postman/curl through localhost:8080-8083; the services
+# talk to each other through the internal Docker network (service names).
+
+x-app: &app
+  environment:
+    SSO_ISSUER_URL: http://localhost:8080    # expected "iss" claim of the tokens
+    SSO_INTERNAL_URL: http://sso-server:8080 # where the app downloads the public key
+  depends_on:
+    sso-server: { condition: service_healthy }
+
+services:
+  sso-server:
+    build: { context: ., args: { APP: sso-server } }
+    ports: ["8080:8080"]
+    environment:
+      ISSUER_URL: http://localhost:8080
+      APPS: catalog=http://catalog:8081,library=http://library:8082,forum=http://forum:8083
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      interval: 3s
+      retries: 10
+
+  catalog:
+    <<: *app
+    build: { context: ., args: { APP: catalog } }
+    ports: ["8081:8081"]
+
+  library:
+    <<: *app
+    build: { context: ., args: { APP: library } }
+    ports: ["8082:8082"]
+
+  forum:
+    <<: *app
+    build: { context: ., args: { APP: forum } }
+    ports: ["8083:8083"]
